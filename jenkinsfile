@@ -1,0 +1,43 @@
+    pipeline {
+        agent any
+
+        environment {
+            AWS_ACCESS_KEY_ID = credentials('aws-access-key')
+            AWS_SECRET_ACCESS_KEY = credentials('aws-secret-key')
+        }
+
+        stages {
+            stage('Checkout') {
+                steps {
+                    git 'https://github.com/your-repo/terraform-code.git'
+                }
+            }
+
+            stage('Install Dependencies') {
+                steps {
+                    sh 'sudo apt-get update'
+                    sh 'sudo apt-get install -y unzip'
+                    sh 'curl -LO https://releases.hashicorp.com/terraform/1.0.0/terraform_1.0.0_linux_amd64.zip'
+                    sh 'unzip terraform_1.0.0_linux_amd64.zip'
+                    sh 'sudo mv terraform /usr/local/bin/'
+                    sh 'curl -Lo kops https://github.com/kubernetes/kops/releases/download/v1.18.2/kops-linux-amd64'
+                    sh 'chmod +x kops'
+                    sh 'sudo mv kops /usr/local/bin/'
+                }
+            }
+
+            stage('Terraform Init') {
+                steps {
+                    sh 'terraform init'
+                }
+            }
+
+            stage('Terraform Apply') {
+                steps {
+                    withCredentials([string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')]) {
+                        sh 'terraform apply -auto-approve -var aws_access_key_id=$AWS_ACCESS_KEY_ID -var aws_secret_access_key=$AWS_SECRET_ACCESS_KEY'
+                    }
+                }
+            }
+        }
+    }
